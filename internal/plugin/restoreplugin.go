@@ -17,46 +17,69 @@ limitations under the License.
 package plugin
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"k8s.io/apimachinery/pkg/api/meta"
 )
 
-// RestorePlugin is a restore item action plugin for Velero
 type RestorePlugin struct {
-	log logrus.FieldLogger
+	log    logrus.FieldLogger
+	secret string
 }
 
-// NewRestorePlugin instantiates a RestorePlugin.
 func NewRestorePlugin(log logrus.FieldLogger) *RestorePlugin {
-	return &RestorePlugin{log: log}
+	secret, _ := getSecret()
+	return &RestorePlugin{log: log, secret: secret}
 }
 
-// AppliesTo returns information about which resources this action should be invoked for.
-// A RestoreItemAction's Execute function will only be invoked on items that match the returned
-// selector. A zero-valued ResourceSelector matches all resources.g
 func (p *RestorePlugin) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{}, nil
 }
 
-// Execute allows the RestorePlugin to perform arbitrary logic with the item being restored,
-// in this case, setting a custom annotation on the item being restored.
 func (p *RestorePlugin) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	p.log.Info("Hello from my RestorePlugin!")
 
-	metadata, err := meta.Accessor(input.Item)
+	content := input.Item.UnstructuredContent()
+	decryptedContent := decrypt(content["content"].(string), p.secret)
+	jsonBytes := []byte(decryptedContent)
+	contentMap := make(map[string]interface{})
+	err := json.Unmarshal(jsonBytes, contentMap)
 	if err != nil {
-		return &velero.RestoreItemActionExecuteOutput{}, err
+		return nil, err
 	}
-
-	annotations := metadata.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	annotations["velero.io/my-restore-plugin"] = "1"
-
-	metadata.SetAnnotations(annotations)
+	input.Item.SetUnstructuredContent(content)
 
 	return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
+}
+
+func decrypt(encryptedString string, keyString string) (decryptedString string) {
+
+	key, _ := hex.DecodeString(keyString)
+	enc, _ := hex.DecodeString(encryptedString)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	nonceSize := aesGCM.NonceSize()
+
+	nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
+
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return fmt.Sprintf("%s", plaintext)
 }

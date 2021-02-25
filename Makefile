@@ -17,7 +17,7 @@ BIN := velero-encryption
 
 REGISTRY ?= magedmotawea
 IMAGE    ?= $(REGISTRY)/velero-encryption
-VERSION  ?= 0.1 
+VERSION  ?= v0.0.1 
 
 GOOS   ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)

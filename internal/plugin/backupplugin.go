@@ -17,8 +17,13 @@ limitations under the License.
 package plugin
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/sirupsen/logrus"
 
@@ -29,11 +34,13 @@ import (
 )
 
 type BackupPlugin struct {
-	log logrus.FieldLogger
+	log    logrus.FieldLogger
+	secret string
 }
 
 func NewBackupPlugin(log logrus.FieldLogger) *BackupPlugin {
-	return &BackupPlugin{log: log}
+	secret, _ := getSecret()
+	return &BackupPlugin{log: log, secret: secret}
 }
 
 func (p *BackupPlugin) AppliesTo() (velero.ResourceSelector, error) {
@@ -42,14 +49,45 @@ func (p *BackupPlugin) AppliesTo() (velero.ResourceSelector, error) {
 
 func (p *BackupPlugin) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	p.log.Info("encrypting item")
+
 	// change everything to map in format({"encrypted": encrypted json string})
-	serialized, err := json.Marshal(item.UnstructuredContent())
+	content := item.UnstructuredContent()
+	serialized, err := json.Marshal(content)
 	if err != nil {
 		p.log.Error(fmt.Sprintf("failed to serialize item %v ", err))
 		return nil, nil, err
 	}
+
+	encrypted := encrypt(string(serialized), p.secret)
 	m := make(map[string]interface{})
-	m["encrypted"] = serialized
+	m["content"] = encrypted
+	m["kind"] = content["kind"]
 	item.SetUnstructuredContent(m)
+	p.log.Info(item)
+	p.log.Info("encrypted item")
 	return item, nil, nil
+}
+
+func encrypt(stringToEncrypt string, keyString string) (encryptedString string) {
+
+	key, _ := hex.DecodeString(keyString)
+	plaintext := []byte(stringToEncrypt)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		panic(err.Error())
+	}
+
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
+	return fmt.Sprintf("%x", ciphertext)
 }
