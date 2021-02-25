@@ -17,8 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"github.com/m-motawea/velero-encryption/internal/plugin"
 	"github.com/sirupsen/logrus"
-	"github.com/vmware-tanzu/velero-plugin-example/internal/plugin"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
