@@ -45,7 +45,7 @@ func (p *BackupPlugin) Execute(item runtime.Unstructured, backup *v1.Backup) (ru
 	// change everything to map in format({"encrypted": encrypted json string})
 	serialized, err := json.Marshal(item.UnstructuredContent())
 	if err != nil {
-		p.log.Error(fmt.Sprintf("failed to encrypt item %v ", err))
+		p.log.Error(fmt.Sprintf("failed to serialize item %v ", err))
 		return nil, nil, err
 	}
 	m := make(map[string]interface{})
