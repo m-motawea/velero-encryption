@@ -17,6 +17,9 @@ limitations under the License.
 package plugin
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,8 +41,15 @@ func (p *BackupPlugin) AppliesTo() (velero.ResourceSelector, error) {
 }
 
 func (p *BackupPlugin) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
-	p.log.Info("backing up")
-	p.log.Info(item)
-
+	p.log.Info("encrypting item")
+	// change everything to map in format({"encrypted": encrypted json string})
+	serialized, err := json.Marshal(item.UnstructuredContent())
+	if err != nil {
+		p.log.Error(fmt.Sprintf("failed to encrypt item %v ", err))
+		return nil, nil, err
+	}
+	m := make(map[string]interface{})
+	m["encrypted"] = serialized
+	item.SetUnstructuredContent(m)
 	return item, nil, nil
 }

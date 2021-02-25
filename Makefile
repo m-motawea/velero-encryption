@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PKG := github.com/vmware-tanzu/velero-plugin-example
-BIN := velero-plugin-example
+PKG := github.com/m-motawea/velero-encryption
+BIN := velero-encryption
 
-REGISTRY ?= velero
-IMAGE    ?= $(REGISTRY)/velero-plugin-example
+REGISTRY ?= magedmotawea
+IMAGE    ?= $(REGISTRY)/velero-encryption
 VERSION  ?= main 
 
 GOOS   ?= $(shell go env GOOS)
